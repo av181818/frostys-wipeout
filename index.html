@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Frosty's Wipeout</title> <!-- Updated title -->
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { width: 720px; height: 100%; display: block; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 720; // Fixed width
+
+        // Load images
+        const snowmanImg = new Image();
+        snowmanImg.src = 'snowman.png'; // Placeholder: 30x30 snowman image
+        const treeImg = new Image();
+        treeImg.src = 'tree.png';   // Placeholder: 50x50 tree image
+
+        // Game variables
+        let player;
+        let trees = [];
+        let score = 0;
+        let highScore = 0;
+        let gameOver = false;
+        let scrollY = 0;
+        let gameStarted = false;
+        let lastTime = 0;
+        let imagesLoaded = 0;
+
+        // Input flags
+        let leftPressed = false;
+        let rightPressed = false;
+
+        // Scale factor based on fixed width 720
+        const baseWidth = 720;
+        function getScale() {
+            return canvas.width / baseWidth; // Scale based on fixed width only
+        }
+
+        // Adjust canvas height dynamically
+        function updateCanvasSize() {
+            canvas.height = window.innerHeight;
+            if (imagesLoaded === 2 && !gameStarted && !gameOver) {
+                initGame();
+            }
+        }
+        updateCanvasSize();
+        window.addEventListener('resize', updateCanvasSize);
+
+        // Wait for images to load
+        function imageLoaded() {
+            imagesLoaded++;
+            if (imagesLoaded === 2) {
+                initGame(); // Start game once images are loaded
+            }
+        }
+        snowmanImg.onload = imageLoaded;
+        treeImg.onload = imageLoaded;
+        snowmanImg.onerror = () => console.error("Failed to load snowman.png");
+        treeImg.onerror = () => console.error("Failed to load tree.png");
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                leftPressed = true;
+                if (!gameStarted && !gameOver) {
+                    gameStarted = true;
+                    spawnTrees(); // Spawn trees on first input
+                }
+            }
+            if (e.key === 'ArrowRight') {
+                rightPressed = true;
+                if (!gameStarted && !gameOver) {
+                    gameStarted = true;
+                    spawnTrees(); // Spawn trees on first input
+                }
+            }
+            if (e.key === ' ' && gameOver) { // Spacebar to restart
+                e.preventDefault(); // Prevent scrolling
+                restartGame();
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') leftPressed = false;
+            if (e.key === 'ArrowRight') rightPressed = false;
+        });
+
+        // Initialize game
+        function initGame() {
+            const scale = getScale();
+            player = {
+                x: 360,          // Center of 720
+                y: canvas.height / 3, // One-third down from top
+                radius: 11.25 * scale, // snowman 50% larger
+                speed: 375       // Original 300 + 25% = 375 pixels/second
+            };
+            trees = []; // Trees start empty, spawned later
+            if (!lastTime) {
+                lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Spawn 200 trees off-screen (below the canvas)
+        function spawnTrees() {
+            const scale = getScale();
+            for (let i = 0; i < 200; i++) {
+                trees.push({
+                    x: Math.random() * 720,
+                    y: canvas.height + Math.random() * (canvas.height * 10), // Start below screen
+                    radius: 15 * scale // 20% larger (was 12.5 * scale)
+                });
+            }
+        }
+
+        // Game loop with delta time
+        function gameLoop(currentTime) {
+            const dt = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+
+            update(dt);
+            render();
+
+            if (!gameOver) {
+                requestAnimationFrame(gameLoop);
+            } else {
+                // Update high score before displaying
+                if (score > highScore) {
+                    highScore = score;
+                }
+
+                const scale = getScale();
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0, 0, 720, canvas.height);
+                ctx.fillStyle = 'white';
+
+                // Center "GAME OVER" text
+                ctx.font = `${36 * scale}px Bangers`;
+                const gameOverText = 'GAME OVER';
+                const gameOverWidth = ctx.measureText(gameOverText).width;
+                ctx.fillText(gameOverText, (720 - gameOverWidth) / 2, canvas.height / 2 - 50 * scale);
+
+                // Center "SCORE" text
+                ctx.font = `${18 * scale}px Bangers`;
+                const scoreText = `SCORE: ${score}`.toUpperCase();
+                const scoreWidth = ctx.measureText(scoreText).width;
+                ctx.fillText(scoreText, (720 - scoreWidth) / 2, canvas.height / 2 - 20 * scale);
+
+                // Center "HIGH SCORE" text
+                const highScoreText = `HIGH SCORE: ${highScore}`.toUpperCase();
+                const highScoreWidth = ctx.measureText(highScoreText).width;
+                ctx.fillText(highScoreText, (720 - highScoreWidth) / 2, canvas.height / 2 + 10 * scale);
+
+                // Show "NEW HIGH SCORE!" if applicable
+                if (score === highScore) {
+                    const newHighScoreText = 'NEW HIGH SCORE!';
+                    const newHighScoreWidth = ctx.measureText(newHighScoreText).width;
+                    ctx.fillText(newHighScoreText, (720 - newHighScoreWidth) / 2, canvas.height / 2 + 40 * scale);
+                    const restartText = 'CLICK OR PRESS SPACE TO RESTART';
+                    ctx.fillText(restartText, (720 - ctx.measureText(restartText).width) / 2, canvas.height / 2 + 80 * scale);
+                } else {
+                    const restartText = 'CLICK OR PRESS SPACE TO RESTART';
+                    ctx.fillText(restartText, (720 - ctx.measureText(restartText).width) / 2, canvas.height / 2 + 60 * scale);
+                }
+
+                canvas.addEventListener('click', restartGame, { once: true });
+            }
+        }
+
+        // Update game state
+        function update(dt) {
+            const scale = getScale();
+            const moveSpeed = 4.6875 * scale; // 25% faster than 3.75, scaled
+
+            if (leftPressed) player.x -= moveSpeed;
+            if (rightPressed) player.x += moveSpeed;
+            player.x = Math.max(0, Math.min(720, player.x));
+
+            if (gameStarted) {
+                const scrollSpeed = player.speed * dt; // 375 pixels/second
+                scrollY += scrollSpeed;
+                player.y += scrollSpeed;
+
+                // Player-tree collision
+                for (let i = 0; i < trees.length; i++) {
+                    let tree = trees[i];
+                    let dx = player.x - tree.x;
+                    let dy = player.y - tree.y;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < player.radius + tree.radius) {
+                        gameOver = true;
+                        break;
+                    }
+                }
+
+                // Tree-tree collision to remove overlaps
+                for (let i = 0; i < trees.length; i++) {
+                    for (let j = i + 1; j < trees.length; j++) {
+                        let treeA = trees[i];
+                        let treeB = trees[j];
+                        let dx = treeA.x - treeB.x;
+                        let dy = treeA.y - treeB.y;
+                        let distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance < treeA.radius + treeB.radius) {
+                            trees.splice(j, 1); // Remove one tree
+                            j--; // Adjust index after removal
+                        }
+                    }
+                }
+
+                // Recycle trees
+                for (let i = 0; i < trees.length; i++) {
+                    if (trees[i].y < scrollY - canvas.height) {
+                        trees[i].y = scrollY + canvas.height + Math.random() * (canvas.height * 2);
+                        trees[i].x = Math.random() * 720;
+                    }
+                }
+
+                score = Math.floor(player.y / (10 * scale));
+            }
+        }
+
+        // Render the scene
+        function render() {
+            const scale = getScale();
+            ctx.clearRect(0, 0, 720, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 720, canvas.height);
+
+            // Draw trees (20% larger)
+            for (let tree of trees) {
+                let screenY = tree.y - scrollY;
+                if (screenY > -30 * scale && screenY < canvas.height + 30 * scale) {
+                    ctx.drawImage(treeImg, tree.x - 15 * scale, screenY - 15 * scale, 30 * scale, 30 * scale);
+                }
+            }
+
+            // Draw player (50% larger)
+            let playerScreenY = player.y - scrollY;
+            ctx.drawImage(snowmanImg, player.x - 11.25 * scale, playerScreenY - 11.25 * scale, 22.5 * scale, 22.5 * scale);
+
+            // Draw score
+            ctx.fillStyle = 'black';
+            ctx.font = `${18 * scale}px Bangers`;
+            const scoreText = `SCORE: ${score}`.toUpperCase();
+            ctx.fillText(scoreText, 10 * scale, 30 * scale);
+
+            if (!gameStarted) {
+                ctx.fillStyle = 'black';
+                ctx.font = `${18 * scale}px Bangers`;
+                const startText = 'MOVE LEFT OR RIGHT TO START';
+                const startTextWidth = ctx.measureText(startText).width;
+                ctx.fillText(startText, (720 - startTextWidth) / 2, canvas.height / 2);
+            }
+        }
+
+        // Restart game
+        function restartGame() {
+            const scale = getScale();
+            player.x = 360;
+            player.y = canvas.height / 3; // Reset to one-third down
+            scrollY = 0;
+            score = 0;
+            gameOver = false;
+            gameStarted = false;
+            trees = []; // Reset trees array (no trees until input)
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
