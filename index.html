@@ -2,28 +2,94 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Frosty's Wipeout</title> <!-- Updated title -->
+    <title>Frosty's Wipeout</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { width: 720px; height: 100%; display: block; }
+        .leaderboard { 
+            position: absolute; 
+            top: 15px; 
+            right: 15px; 
+            color: #fff; 
+            font-family: 'Press Start 2P', cursive; 
+            background: rgba(0,0,0,0.8); 
+            padding: 15px; 
+            border-radius: 8px; 
+            text-shadow: 2px 2px 4px #000;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        #nameInputOverlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            font-family: 'Press Start 2P', cursive;
+            color: white;
+            display: none;
+        }
+        #nameInputOverlay input {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            padding: 5px;
+            width: 300px; /* Increased from 200px to fit ~18 characters */
+            text-align: center;
+            background: #fff;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+        }
+        #nameInputOverlay p {
+            margin: 0 0 10px 0;
+            text-shadow: 2px 2px 4px #000;
+        }
+        #nameInputOverlay button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            padding: 5px 10px;
+            margin-top: 10px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #nameInputOverlay button:hover {
+            background: #cc3333;
+        }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+    <div id="leaderboard" class="leaderboard"></div>
+    <div id="nameInputOverlay">
+        <p>Enter Your Name (Max 16):</p>
+        <input type="text" id="nameInput" maxlength="16" placeholder="Your Name">
+        <br>
+        <button id="skipButton">Skip</button>
+    </div>
     <script>
-        // Canvas setup
+        const { createClient } = supabase;
+        const supabaseClient = createClient(
+            'https://kxjydziwumtzhbbgycfu.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4anlkeml3dW10emhiYmd5Y2Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA1ODg2OTgsImV4cCI6MjA1NjE2NDY5OH0.aNu1pMcaI3uTt3fpdkZtvTbyILtTPN8smMUINmNQczg'
+        );
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = 720; // Fixed width
+        canvas.width = 720;
 
-        // Load images
         const snowmanImg = new Image();
-        snowmanImg.src = 'snowman.png'; // Placeholder: 30x30 snowman image
+        snowmanImg.src = 'snowman.png';
         const treeImg = new Image();
-        treeImg.src = 'tree.png';   // Placeholder: 50x50 tree image
+        treeImg.src = 'tree.png';
 
-        // Game variables
         let player;
         let trees = [];
         let score = 0;
@@ -33,18 +99,16 @@
         let gameStarted = false;
         let lastTime = 0;
         let imagesLoaded = 0;
+        let leaderboardData = [];
 
-        // Input flags
         let leftPressed = false;
         let rightPressed = false;
 
-        // Scale factor based on fixed width 720
         const baseWidth = 720;
         function getScale() {
-            return canvas.width / baseWidth; // Scale based on fixed width only
+            return canvas.width / baseWidth;
         }
 
-        // Adjust canvas height dynamically
         function updateCanvasSize() {
             canvas.height = window.innerHeight;
             if (imagesLoaded === 2 && !gameStarted && !gameOver) {
@@ -54,11 +118,11 @@
         updateCanvasSize();
         window.addEventListener('resize', updateCanvasSize);
 
-        // Wait for images to load
         function imageLoaded() {
             imagesLoaded++;
             if (imagesLoaded === 2) {
-                initGame(); // Start game once images are loaded
+                initGame();
+                fetchLeaderboard();
             }
         }
         snowmanImg.onload = imageLoaded;
@@ -66,24 +130,23 @@
         snowmanImg.onerror = () => console.error("Failed to load snowman.png");
         treeImg.onerror = () => console.error("Failed to load tree.png");
 
-        // Keyboard controls
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft') {
                 leftPressed = true;
                 if (!gameStarted && !gameOver) {
                     gameStarted = true;
-                    spawnTrees(); // Spawn trees on first input
+                    spawnTrees();
                 }
             }
             if (e.key === 'ArrowRight') {
                 rightPressed = true;
                 if (!gameStarted && !gameOver) {
                     gameStarted = true;
-                    spawnTrees(); // Spawn trees on first input
+                    spawnTrees();
                 }
             }
-            if (e.key === ' ' && gameOver) { // Spacebar to restart
-                e.preventDefault(); // Prevent scrolling
+            if (e.key === ' ' && gameOver && document.getElementById('nameInputOverlay').style.display === 'none') {
+                e.preventDefault();
                 restartGame();
             }
         });
@@ -92,35 +155,118 @@
             if (e.key === 'ArrowRight') rightPressed = false;
         });
 
-        // Initialize game
         function initGame() {
             const scale = getScale();
             player = {
-                x: 360,          // Center of 720
-                y: canvas.height / 3, // One-third down from top
-                radius: 11.25 * scale, // snowman 50% larger
-                speed: 375       // Original 300 + 25% = 375 pixels/second
+                x: 360,
+                y: canvas.height / 3,
+                radius: 11.25 * scale,
+                speed: 375
             };
-            trees = []; // Trees start empty, spawned later
+            trees = [];
             if (!lastTime) {
                 lastTime = performance.now();
                 requestAnimationFrame(gameLoop);
             }
         }
 
-        // Spawn 200 trees off-screen (below the canvas)
         function spawnTrees() {
             const scale = getScale();
             for (let i = 0; i < 200; i++) {
                 trees.push({
                     x: Math.random() * 720,
-                    y: canvas.height + Math.random() * (canvas.height * 10), // Start below screen
-                    radius: 15 * scale // 20% larger (was 12.5 * scale)
+                    y: canvas.height + Math.random() * (canvas.height * 10),
+                    radius: 15 * scale
                 });
             }
         }
 
-        // Game loop with delta time
+        async function fetchLeaderboard() {
+            const { data, error } = await supabaseClient
+                .from('leaderboard')
+                .select('name, score')
+                .order('score', { ascending: false })
+                .limit(10);
+            if (error) {
+                console.error('Error fetching leaderboard:', error);
+            } else {
+                leaderboardData = data || [];
+                renderLeaderboard();
+            }
+        }
+
+        function renderLeaderboard() {
+            const leaderboardDiv = document.getElementById('leaderboard');
+            const scale = getScale();
+            leaderboardDiv.style.fontSize = `${16 * scale}px`;
+            leaderboardDiv.innerHTML = '<h3>Leaderboard</h3>';
+            leaderboardData.forEach((entry, index) => {
+                leaderboardDiv.innerHTML += `<p>${index + 1}. ${entry.name.padEnd(20, ' ')} - ${entry.score}</p>`;
+            });
+        }
+
+        async function submitScore(name, score) {
+            const trimmedName = name.substring(0, 16);
+            const { error } = await supabaseClient
+                .from('leaderboard')
+                .insert([{ name: trimmedName, score }]);
+            if (error) {
+                console.error('Error submitting score:', error);
+            } else {
+                fetchLeaderboard();
+            }
+        }
+
+        function showNameInput() {
+            const overlay = document.getElementById('nameInputOverlay');
+            const input = document.getElementById('nameInput');
+            const skipButton = document.getElementById('skipButton');
+            input.value = '';
+            overlay.style.display = 'block';
+            input.focus();
+
+            const submitName = (e) => {
+                if (e.key === 'Enter') {
+                    const name = input.value.trim();
+                    if (name) {
+                        submitScore(name, score);
+                    }
+                    overlay.style.display = 'none';
+                    input.removeEventListener('keydown', submitName);
+                    document.removeEventListener('keydown', skipName);
+                    renderRestartText();
+                } else if (e.key === 'Escape') {
+                    skipSubmission();
+                }
+            };
+
+            const skipName = (e) => {
+                if (e.key === 'Escape') {
+                    skipSubmission();
+                }
+            };
+
+            const skipSubmission = () => {
+                overlay.style.display = 'none';
+                input.removeEventListener('keydown', submitName);
+                document.removeEventListener('keydown', skipName);
+                skipButton.removeEventListener('click', skipSubmission);
+                renderRestartText();
+            };
+
+            input.addEventListener('keydown', submitName);
+            document.addEventListener('keydown', skipName);
+            skipButton.addEventListener('click', skipSubmission);
+        }
+
+        function renderRestartText() {
+            const scale = getScale();
+            ctx.font = `${16 * scale}px 'Press Start 2P'`;
+            const restartText = 'CLICK OR PRESS SPACE TO RESTART';
+            ctx.fillText(restartText, 360, canvas.height / 2 + 90 * scale);
+            canvas.addEventListener('click', restartGame, { once: true });
+        }
+
         function gameLoop(currentTime) {
             const dt = (currentTime - lastTime) / 1000;
             lastTime = currentTime;
@@ -131,7 +277,6 @@
             if (!gameOver) {
                 requestAnimationFrame(gameLoop);
             } else {
-                // Update high score before displaying
                 if (score > highScore) {
                     highScore = score;
                 }
@@ -140,55 +285,41 @@
                 ctx.fillStyle = 'rgba(0,0,0,0.5)';
                 ctx.fillRect(0, 0, 720, canvas.height);
                 ctx.fillStyle = 'white';
+                ctx.textAlign = 'center';
 
-                // Center "GAME OVER" text
-                ctx.font = `${36 * scale}px Bangers`;
+                ctx.font = `${36 * scale}px 'Press Start 2P'`;
                 const gameOverText = 'GAME OVER';
-                const gameOverWidth = ctx.measureText(gameOverText).width;
-                ctx.fillText(gameOverText, (720 - gameOverWidth) / 2, canvas.height / 2 - 50 * scale);
+                ctx.fillText(gameOverText, 360, canvas.height / 2 - 70 * scale);
 
-                // Center "SCORE" text
-                ctx.font = `${18 * scale}px Bangers`;
+                ctx.font = `${20 * scale}px 'Press Start 2P'`;
                 const scoreText = `SCORE: ${score}`.toUpperCase();
-                const scoreWidth = ctx.measureText(scoreText).width;
-                ctx.fillText(scoreText, (720 - scoreWidth) / 2, canvas.height / 2 - 20 * scale);
+                ctx.fillText(scoreText, 360, canvas.height / 2 - 30 * scale);
 
-                // Center "HIGH SCORE" text
                 const highScoreText = `HIGH SCORE: ${highScore}`.toUpperCase();
-                const highScoreWidth = ctx.measureText(highScoreText).width;
-                ctx.fillText(highScoreText, (720 - highScoreWidth) / 2, canvas.height / 2 + 10 * scale);
+                ctx.fillText(highScoreText, 360, canvas.height / 2 + 10 * scale);
 
-                // Show "NEW HIGH SCORE!" if applicable
                 if (score === highScore) {
                     const newHighScoreText = 'NEW HIGH SCORE!';
-                    const newHighScoreWidth = ctx.measureText(newHighScoreText).width;
-                    ctx.fillText(newHighScoreText, (720 - newHighScoreWidth) / 2, canvas.height / 2 + 40 * scale);
-                    const restartText = 'CLICK OR PRESS SPACE TO RESTART';
-                    ctx.fillText(restartText, (720 - ctx.measureText(restartText).width) / 2, canvas.height / 2 + 80 * scale);
-                } else {
-                    const restartText = 'CLICK OR PRESS SPACE TO RESTART';
-                    ctx.fillText(restartText, (720 - ctx.measureText(restartText).width) / 2, canvas.height / 2 + 60 * scale);
+                    ctx.fillText(newHighScoreText, 360, canvas.height / 2 + 50 * scale);
                 }
 
-                canvas.addEventListener('click', restartGame, { once: true });
+                setTimeout(showNameInput, 500);
             }
         }
 
-        // Update game state
         function update(dt) {
             const scale = getScale();
-            const moveSpeed = 4.6875 * scale; // 25% faster than 3.75, scaled
+            const moveSpeed = 4.6875 * scale;
 
             if (leftPressed) player.x -= moveSpeed;
             if (rightPressed) player.x += moveSpeed;
             player.x = Math.max(0, Math.min(720, player.x));
 
             if (gameStarted) {
-                const scrollSpeed = player.speed * dt; // 375 pixels/second
+                const scrollSpeed = player.speed * dt;
                 scrollY += scrollSpeed;
                 player.y += scrollSpeed;
 
-                // Player-tree collision
                 for (let i = 0; i < trees.length; i++) {
                     let tree = trees[i];
                     let dx = player.x - tree.x;
@@ -200,7 +331,6 @@
                     }
                 }
 
-                // Tree-tree collision to remove overlaps
                 for (let i = 0; i < trees.length; i++) {
                     for (let j = i + 1; j < trees.length; j++) {
                         let treeA = trees[i];
@@ -209,13 +339,12 @@
                         let dy = treeA.y - treeB.y;
                         let distance = Math.sqrt(dx * dx + dy * dy);
                         if (distance < treeA.radius + treeB.radius) {
-                            trees.splice(j, 1); // Remove one tree
-                            j--; // Adjust index after removal
+                            trees.splice(j, 1);
+                            j--;
                         }
                     }
                 }
 
-                // Recycle trees
                 for (let i = 0; i < trees.length; i++) {
                     if (trees[i].y < scrollY - canvas.height) {
                         trees[i].y = scrollY + canvas.height + Math.random() * (canvas.height * 2);
@@ -227,14 +356,12 @@
             }
         }
 
-        // Render the scene
         function render() {
             const scale = getScale();
             ctx.clearRect(0, 0, 720, canvas.height);
             ctx.fillStyle = 'white';
             ctx.fillRect(0, 0, 720, canvas.height);
 
-            // Draw trees (20% larger)
             for (let tree of trees) {
                 let screenY = tree.y - scrollY;
                 if (screenY > -30 * scale && screenY < canvas.height + 30 * scale) {
@@ -242,35 +369,33 @@
                 }
             }
 
-            // Draw player (50% larger)
             let playerScreenY = player.y - scrollY;
             ctx.drawImage(snowmanImg, player.x - 11.25 * scale, playerScreenY - 11.25 * scale, 22.5 * scale, 22.5 * scale);
 
-            // Draw score
             ctx.fillStyle = 'black';
-            ctx.font = `${18 * scale}px Bangers`;
+            ctx.font = `${20 * scale}px 'Press Start 2P'`;
+            ctx.textAlign = 'left';
             const scoreText = `SCORE: ${score}`.toUpperCase();
-            ctx.fillText(scoreText, 10 * scale, 30 * scale);
+            ctx.fillText(scoreText, 15 * scale, 40 * scale);
 
             if (!gameStarted) {
                 ctx.fillStyle = 'black';
-                ctx.font = `${18 * scale}px Bangers`;
+                ctx.font = `${24 * scale}px 'Press Start 2P'`;
+                ctx.textAlign = 'center';
                 const startText = 'MOVE LEFT OR RIGHT TO START';
-                const startTextWidth = ctx.measureText(startText).width;
-                ctx.fillText(startText, (720 - startTextWidth) / 2, canvas.height / 2);
+                ctx.fillText(startText, 360, canvas.height / 2);
             }
         }
 
-        // Restart game
         function restartGame() {
             const scale = getScale();
             player.x = 360;
-            player.y = canvas.height / 3; // Reset to one-third down
+            player.y = canvas.height / 3;
             scrollY = 0;
             score = 0;
             gameOver = false;
             gameStarted = false;
-            trees = []; // Reset trees array (no trees until input)
+            trees = [];
             lastTime = performance.now();
             requestAnimationFrame(gameLoop);
         }
