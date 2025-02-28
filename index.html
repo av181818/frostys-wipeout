@@ -36,7 +36,7 @@
             font-family: 'Press Start 2P', cursive;
             font-size: 16px;
             padding: 5px;
-            width: 300px; /* Increased from 200px to fit ~18 characters */
+            width: 300px;
             text-align: center;
             background: #fff;
             color: #000;
@@ -80,6 +80,17 @@
             'https://kxjydziwumtzhbbgycfu.supabase.co',
             'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4anlkeml3dW10emhiYmd5Y2Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA1ODg2OTgsImV4cCI6MjA1NjE2NDY5OH0.aNu1pMcaI3uTt3fpdkZtvTbyILtTPN8smMUINmNQczg'
         );
+
+        // Sign in anonymously when the game loads
+        async function initAuth() {
+            const { data, error } = await supabaseClient.auth.signInAnonymously();
+            if (error) {
+                console.error('Anonymous sign-in failed:', error);
+            } else {
+                console.log('Signed in as:', data.user.id); // Optional: for debugging
+            }
+        }
+        initAuth(); // Call this once when the game starts
 
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -187,9 +198,8 @@
                 .select('name, score')
                 .order('score', { ascending: false })
                 .limit(10);
-            if (error) {
-                console.error('Error fetching leaderboard:', error);
-            } else {
+            if (error) console.error('Error fetching leaderboard:', error);
+            else {
                 leaderboardData = data || [];
                 renderLeaderboard();
             }
@@ -210,11 +220,8 @@
             const { error } = await supabaseClient
                 .from('leaderboard')
                 .insert([{ name: trimmedName, score }]);
-            if (error) {
-                console.error('Error submitting score:', error);
-            } else {
-                fetchLeaderboard();
-            }
+            if (error) console.error('Error submitting score:', error);
+            else fetchLeaderboard();
         }
 
         function showNameInput() {
