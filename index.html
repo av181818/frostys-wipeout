@@ -6,10 +6,16 @@
     <style>
         body { margin: 0; overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
         canvas { width: 720px; height: 100%; display: block; }
+        #coffeeButton { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); z-index: 1000; }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
+    <div id="coffeeButton" style="text-align: center">
+        <a href="https://www.buymeacoffee.com/av18" target="_blank">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 35px !important;width: 125px !important">
+        </a>
+    </div>
     <canvas id="gameCanvas"></canvas>
     <script>
         const canvas = document.getElementById('gameCanvas');
